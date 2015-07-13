@@ -1,8 +1,16 @@
 import re
 import sublime, sublime_plugin
+import os.path, time
+import sys
 
 class SymfonyCommand(sublime_plugin.TextCommand):
+	def __init__(self, view):
+		with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'r') as f:
+			self.read_data = f.read()
+		self.view = view
+
 	def run(self, edit):
+		last_modified_time = time.ctime(os.path.getmtime(self.view.file_name()))
 		methods_mask = re.compile(r'(public|private|protected) function (\w+)')
 		attributes_mask = re.compile(r'(public|private|protected) \$(\w+);')
 		class_mask = re.compile(r'^class (\w+)')
