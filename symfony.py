@@ -37,6 +37,8 @@ class SymfonyCommand(sublime_plugin.TextCommand):
         type_var_2_mask = re.compile(r'^\* @ORM\\(OneToOne|OneToMany|ManyToOne|ManyToMany)\(targetEntity\="([\\|\w]+)"\,?(.*)\)')
         class_mask = re.compile(r'^class (\w+)')
         return_mask = re.compile(r'^\* @return ([\\|\w]+)')
+        if False:
+            param_mask = re.compile(r'^\* @param ([\\|\w]+) \$(\w+)')
         functions_return_mask = re.compile(r'^return \$this->(\w+);')
         methods = []
         attributes = []
@@ -58,6 +60,8 @@ class SymfonyCommand(sublime_plugin.TextCommand):
             results_types_2 = type_var_2_mask.match(line)
             results_returns = return_mask.match(line)
             results_functions_returns = functions_return_mask.match(line)
+            if False:
+                results_params = param_mask.match(line)
 
             if results_class:
                 current_class = results_class.group(1).lower()
@@ -88,6 +92,13 @@ class SymfonyCommand(sublime_plugin.TextCommand):
             
             elif results_returns:
                 r = results_returns.group(1).lower()
+                if "\\" in r or r == current_class:
+                    current_return = VAR_ENTITY,results_returns.group(1).lower().split('\\')[-1]
+                else:
+                    current_return = VAR_PLAIN,results_returns.group(1).lower()
+
+            elif False and results_params:
+                r = results_params.group(1).lower()
                 if "\\" in r or r == current_class:
                     current_return = VAR_ENTITY,results_returns.group(1).lower().split('\\')[-1]
                 else:
