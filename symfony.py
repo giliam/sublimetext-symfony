@@ -31,14 +31,13 @@ class SymfonyCommand(sublime_plugin.TextCommand):
             print("Moyenne de " + str(sum(l)/len(l)) + " s")
 
     def analyse(self):
-        methods_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]+)\)')
+        methods_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
         attributes_mask = re.compile(r'(public|private|protected) \$(\w+);')
         type_var_mask = re.compile(r'^\* @var \\?(\w+)')
         type_var_2_mask = re.compile(r'^\* @ORM\\(OneToOne|OneToMany|ManyToOne|ManyToMany)\(targetEntity\="([\\|\w]+)"\,?(.*)\)')
         class_mask = re.compile(r'^class (\w+)')
         return_mask = re.compile(r'^\* @return ([\\|\w]+)')
-        if False:
-            param_mask = re.compile(r'^\* @param ([\\|\w]+) \$(\w+)')
+        param_mask = re.compile(r'^\* @param ([\\|\w]+) \$(\w+)')
         functions_return_mask = re.compile(r'^return \$this->(\w+);')
         methods = []
         attributes = []
@@ -50,6 +49,7 @@ class SymfonyCommand(sublime_plugin.TextCommand):
         current_type = TYPE_DEFAULT
         they_need_a_guess = []
         needs_a_guess = False
+
         for line in open(self.view.file_name(),'r'):
             n = len(classes)-1
             line = line.strip()
@@ -109,6 +109,14 @@ class SymfonyCommand(sublime_plugin.TextCommand):
                 if attribute_name in attributes[n].keys():
                     methods[n][current_function][1] = attributes[n][attribute_name][1]
                     needs_a_guess = False
+                    they_need_a_guess.pop()
+                else: # The param has not yet been registered
+                    methods[n][current_function][0] = VAR_PLAIN
+                    methods[n][current_function][1] = attribute_name
+        for guess_need in they_need_a_guess:
+            if methods[n][guess_need[1]][1] in attributes[n].keys():
+                methods[n][guess_need[1]][0] = attributes[n][methods[n][guess_need[1]][1]][0]
+                methods[n][guess_need[1]][1] = attributes[n][methods[n][guess_need[1]][1]][1]
         print(methods)
         print(classes)
         print(attributes)
