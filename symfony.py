@@ -1,9 +1,16 @@
 import re
 import sublime, sublime_plugin
 import os.path, time
+from os import name as osname
 import sys
 import threading
 import json
+
+if osname == 'nt':
+    PATH_SLASH = '\\'
+else:
+    PATH_SLASH = '/'
+
 BENCHMARK_IT = 1
 VAL_UNKNOWN = "unknown"
 VAR_PLAIN = 0
@@ -16,7 +23,7 @@ RETURN_DEFAULT = [VAR_PLAIN,"void"]
 
 class SymfonyscanCommand(sublime_plugin.TextCommand):
     def __init__(self, view):
-        with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\last_scan.txt', 'r') as f:
+        with open(os.path.dirname(os.path.realpath(__file__)) + PATH_SLASH + 'Symfony' + PATH_SLASH + 'data' + PATH_SLASH + 'last_scan.txt', 'r') as f:
             self.last_scan = json.loads(f.read())
         self.view = view
 
@@ -24,32 +31,46 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
         l = []
         for i in range(BENCHMARK_IT):
             start = time.time()
-            self.save(self.view.file_name())
+            self.save_file(self.view.file_name())
             end = time.time()
-            l.append(end-start)   
+            l.append(end-start)  
+        self.save_last_scan_info() 
         if BENCHMARK_IT > 1:         
             print("Moyenne de " + str(sum(l)/len(l)) + " s")
+
+    def save_last_scan_info(self):
+        with open(os.path.dirname(os.path.realpath(__file__)) + PATH_SLASH + 'Symfony' + PATH_SLASH + 'data' + PATH_SLASH + 'last_scan.txt', 'w') as f:
+            json.dump(self.last_scan,f)
 
     def shorten_filename(self,filename):
         for i in range(10000):
             for f in sublime.active_window().folders():
-                nf = f.replace("\\\\","\\")
+                nf = f.replace(PATH_SLASH+PATH_SLASH,PATH_SLASH)
                 if nf in filename:
                     filename = filename.replace(nf,"")
-        return filename.strip("\\")
+        return filename.strip(PATH_SLASH).split(".",1)[0].replace(PATH_SLASH,"-")
+        # Takes the main part without the \\ at each end
+        # Then split it to remove the extension
 
-    def save(self,filename):
+    def save_file(self,filename):
         last_modified_time = time.ctime(os.path.getmtime(filename))
         filenameShort = self.shorten_filename(filename)
-        filenameKey = sublime.active_window().project_file_name() + ";" + filenameShort
-        if filenameKey in self.last_scan and self.last_scan[filenameKey] >= time.ctime(os.path.getmtime(filename)):
-            print("Exists and was scanned on the " + str(self.last_scan[filename]))
+        filenameKey = filenameShort
+        project_name = sublime.active_window().project_file_name().split(PATH_SLASH)[-1].split(".")[0]
+        dir_project_scans = os.path.dirname(os.path.realpath(__file__)) + PATH_SLASH + 'Symfony' + PATH_SLASH + 'data' + PATH_SLASH + project_name
+        if not project_name in self.last_scan.keys():
+            self.last_scan[project_name] = {}
+        if not os.path.isdir(dir_project_scans):
+            os.mkdir(dir_project_scans)
+        if project_name in self.last_scan.keys() and filenameKey in self.last_scan[project_name].keys() and self.last_scan[project_name][filenameKey] >= float(os.path.getmtime(filename)):
+            print("Exists and was scanned on the " + time.ctime(self.last_scan[project_name][filenameKey]))
         else:
-            #with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\' + sublime.active_window().project_file_name() + '\\.txt', 'w') as f:
-            #    self.last_scan = json.loads(f.read())
-            print("Has never been scanned")
+            with open(dir_project_scans + PATH_SLASH + str(len(self.last_scan)) + filenameKey + '.txt', 'w') as f:
+                json.dump(self.analyse_file(filename),f)
+            self.last_scan[project_name][filenameKey] = time.time()
+            print("Has never been scanned but it's now done !")
 
-    def analyse(self, filename):
+    def analyse_file(self, filename):
         methods_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
         attributes_mask = re.compile(r'(public|private|protected) \$(\w+);')
         type_var_mask = re.compile(r'^\* @var \\?(\w+)')
@@ -136,9 +157,9 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
             if methods[n][guess_need[1]][1] in attributes[n].keys():
                 methods[n][guess_need[1]][0] = attributes[n][methods[n][guess_need[1]][1]][0]
                 methods[n][guess_need[1]][1] = attributes[n][methods[n][guess_need[1]][1]][1]
-        data = {"classes":classes,"attributes":attributes,"methods":methods}
-        with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'w') as f:
-            json.dump(json.dumps(data), f)
+        return {"classes":classes,"attributes":attributes,"methods":methods}
+        #with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'w') as f:
+        #    json.dump(json.dumps(data), f)
 
     def parse_function_prototype(self,prototype_raw):
         parameters = prototype_raw.split(",")
