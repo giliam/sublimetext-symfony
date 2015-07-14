@@ -1,5 +1,14 @@
 [
 	{ 
-        "keys": ["ctrl+space"], "command": "example"
+        "keys": ["ctrl+alt+space"], 
+        "command": "symfonyscan"
+    },
+    { 
+    	"keys": ["ctrl+-"], 
+    	"command": "show_panel", 
+    	"args": {
+    		"panel": "console", 
+    		"toggle": false
+    	} 
     }
 ]

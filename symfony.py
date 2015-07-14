@@ -2,7 +2,8 @@ import re
 import sublime, sublime_plugin
 import os.path, time
 import sys
-
+import threading
+import json
 BENCHMARK_IT = 1
 VAL_UNKNOWN = "unknown"
 VAR_PLAIN = 0
@@ -13,10 +14,8 @@ CLASS_DEFAULT = VAL_UNKNOWN
 
 RETURN_DEFAULT = [VAR_PLAIN,"void"]
 
-class SymfonyCommand(sublime_plugin.TextCommand):
+class SymfonyscanCommand(sublime_plugin.TextCommand):
     def __init__(self, view):
-        with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'r') as f:
-            self.read_data = f.read()
         self.view = view
 
     def run(self, edit):
@@ -117,9 +116,9 @@ class SymfonyCommand(sublime_plugin.TextCommand):
             if methods[n][guess_need[1]][1] in attributes[n].keys():
                 methods[n][guess_need[1]][0] = attributes[n][methods[n][guess_need[1]][1]][0]
                 methods[n][guess_need[1]][1] = attributes[n][methods[n][guess_need[1]][1]][1]
-        print(methods)
-        print(classes)
-        print(attributes)
+        data = {"classes":classes,"attributes":attributes,"methods":methods}
+        with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'w') as f:
+            json.dump(json.dumps(data), f)
 
     def parse_function_prototype(self,prototype_raw):
         parameters = prototype_raw.split(",")
@@ -131,3 +130,21 @@ class SymfonyCommand(sublime_plugin.TextCommand):
             else:
                 prototype_out.append([VAR_PLAIN,VAL_UNKNOWN,l[-1]])
         return prototype_out
+
+
+class SymfonyAutoComplete(sublime_plugin.EventListener):
+    def on_query_completions(self, view, prefix, locations):
+        current_file = view.file_name()
+        completions = []
+        completions = self.get_autocomplete_list(prefix)
+        completions = list(set(completions))
+        completions.sort()
+        return (completions,sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+
+    def get_autocomplete_list(self, word):
+        autocomplete_list = []
+        with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'r') as f:
+            data = json.loads(f.read())
+        print(word)
+        return autocomplete_list
+#class SymfonyCollectorThread(threading.Thread):
