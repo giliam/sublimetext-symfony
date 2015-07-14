@@ -16,20 +16,40 @@ RETURN_DEFAULT = [VAR_PLAIN,"void"]
 
 class SymfonyscanCommand(sublime_plugin.TextCommand):
     def __init__(self, view):
+        with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\last_scan.txt', 'r') as f:
+            self.last_scan = json.loads(f.read())
         self.view = view
 
     def run(self, edit):
-        last_modified_time = time.ctime(os.path.getmtime(self.view.file_name()))
         l = []
         for i in range(BENCHMARK_IT):
             start = time.time()
-            self.analyse()
+            self.save(self.view.file_name())
             end = time.time()
             l.append(end-start)   
         if BENCHMARK_IT > 1:         
             print("Moyenne de " + str(sum(l)/len(l)) + " s")
 
-    def analyse(self):
+    def shorten_filename(self,filename):
+        for i in range(10000):
+            for f in sublime.active_window().folders():
+                nf = f.replace("\\\\","\\")
+                if nf in filename:
+                    filename = filename.replace(nf,"")
+        return filename.strip("\\")
+
+    def save(self,filename):
+        last_modified_time = time.ctime(os.path.getmtime(filename))
+        filenameShort = self.shorten_filename(filename)
+        filenameKey = sublime.active_window().project_file_name() + ";" + filenameShort
+        if filenameKey in self.last_scan and self.last_scan[filenameKey] >= time.ctime(os.path.getmtime(filename)):
+            print("Exists and was scanned on the " + str(self.last_scan[filename]))
+        else:
+            #with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\' + sublime.active_window().project_file_name() + '\\.txt', 'w') as f:
+            #    self.last_scan = json.loads(f.read())
+            print("Has never been scanned")
+
+    def analyse(self, filename):
         methods_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
         attributes_mask = re.compile(r'(public|private|protected) \$(\w+);')
         type_var_mask = re.compile(r'^\* @var \\?(\w+)')
@@ -49,7 +69,7 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
         they_need_a_guess = []
         needs_a_guess = False
 
-        for line in open(self.view.file_name(),'r'):
+        for line in open(filename,'r'):
             n = len(classes)-1
             line = line.strip()
             results_methods = methods_mask.match(line)
@@ -135,7 +155,6 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
 class SymfonyAutoComplete(sublime_plugin.EventListener):
     def on_query_completions(self, view, prefix, locations):
         current_file = view.file_name()
-        completions = []
         completions = self.get_autocomplete_list(prefix)
         completions = list(set(completions))
         completions.sort()
@@ -145,6 +164,5 @@ class SymfonyAutoComplete(sublime_plugin.EventListener):
         autocomplete_list = []
         with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'r') as f:
             data = json.loads(f.read())
-        print(word)
         return autocomplete_list
 #class SymfonyCollectorThread(threading.Thread):
