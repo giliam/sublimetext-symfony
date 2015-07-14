@@ -3,6 +3,8 @@ import sublime, sublime_plugin
 import os.path, time
 import sys
 
+BENCHMARK_IT = 1
+
 VAR_PLAIN = 0
 VAR_ENTITY = 1
 TYPE_DEFAULT = [VAR_PLAIN,"unknown"]
@@ -19,6 +21,16 @@ class SymfonyCommand(sublime_plugin.TextCommand):
 
     def run(self, edit):
         last_modified_time = time.ctime(os.path.getmtime(self.view.file_name()))
+        l = []
+        for i in range(BENCHMARK_IT):
+            start = time.time()
+            self.analyse()
+            end = time.time()
+            l.append(end-start)   
+        if BENCHMARK_IT > 1:         
+            print("Moyenne de " + str(sum(l)/len(l)) + " s")
+
+    def analyse(self):
         methods_mask = re.compile(r'(public|private|protected) function (\w+)')
         attributes_mask = re.compile(r'(public|private|protected) \$(\w+);')
         type_var_mask = re.compile(r'^\* @var \\?(\w+)')
@@ -79,6 +91,6 @@ class SymfonyCommand(sublime_plugin.TextCommand):
                 if attribute_name in attributes[n].keys():
                     methods[n][current_function][1] = attributes[n][attribute_name][1]
                     needs_a_guess = False
-        print(methods)
-        print(classes)
-        print(attributes)
+        #print(methods)
+        #print(classes)
+        #print(attributes)
