@@ -202,19 +202,22 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
         return {"classes":classes,"attributes":attributes,"methods":methods}
 
     def analyse_controller_file(self, filename):
-        methods_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
-        variables_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
+        functions_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
+        variables_mask = re.compile(r'^\$([\w|_]+) ?= ?\$(.+);$')
         methods = {}
         variables = []
         variables.append([])
 
         for line in open(filename,'r'):
             line = line.strip()
-            results_methods = methods_mask.match(line)
-            if results_methods:
-                current_function = results_methods.group(2).lower()
-                methods[current_function] = [current_function,self.parse_function_prototype(results_methods.group(3).lower())]
-        return {"methods":methods}
+            results_functions = functions_mask.match(line)
+            results_variables = variables_mask.match(line)
+            if results_functions:
+                current_function = results_functions.group(2).lower()
+                methods[current_function] = [current_function,self.parse_function_prototype(results_functions.group(3).lower())]
+            elif results_variables:
+                variable_name = results_variables.group(2)
+        #return {"methods":methods}
 
     def parse_function_prototype(self,prototype_raw):
         parameters = prototype_raw.split(",")
