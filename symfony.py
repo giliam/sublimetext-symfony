@@ -11,6 +11,8 @@ if osname == 'nt':
 else:
     PATH_SLASH = '/'
 
+VOLATILE = True
+
 BENCHMARK_IT = 1
 VAL_UNKNOWN = "unknown"
 VAR_PLAIN = 0
@@ -47,8 +49,11 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
             print("Moyenne de " + str(sum(l)/len(l)) + " s")
 
     def save_last_scan_info(self):
-        with open(os.path.dirname(os.path.realpath(__file__)) + PATH_SLASH + 'Symfony' + PATH_SLASH + 'data' + PATH_SLASH + 'last_scan.txt', 'w') as f:
-            json.dump(self.last_scan,f)
+        if not VOLATILE:
+            with open(os.path.dirname(os.path.realpath(__file__)) + PATH_SLASH + 'Symfony' + PATH_SLASH + 'data' + PATH_SLASH + 'last_scan.txt', 'w') as f:
+                json.dump(self.last_scan,f)
+        else:
+            self.last_scan = {}
 
     def shorten_filename(self,filename):
         for i in range(10000):
@@ -97,9 +102,12 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
             print("Exists and was scanned on the " + time.ctime(self.last_scan[project_name][filenameKey]) + " whereas last modification time of the file is " + time.ctime(os.path.getmtime(filename)))
             return True
         else:
-            with open(dir_project_scans + PATH_SLASH + filenameKey + '.txt', 'w') as f:
-                self.data[project_name][filenameKey] = self.analyse(filename,analyse_type)
-                json.dump(self.data[project_name][filenameKey],f)
+            if not VOLATILE:
+                with open(dir_project_scans + PATH_SLASH + filenameKey + '.txt', 'w') as f:
+                    self.data[project_name][filenameKey] = self.analyse(filename,analyse_type)
+                    json.dump(self.data[project_name][filenameKey],f)
+            else:
+                print(self.analyse(filename,analyse_type))
             self.last_scan[project_name][filenameKey] = time.time()
             print("Has never been scanned but it's now done !")
             return True
@@ -192,11 +200,21 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
                 methods[n][guess_need[1]][0] = attributes[n][methods[n][guess_need[1]][1]][0]
                 methods[n][guess_need[1]][1] = attributes[n][methods[n][guess_need[1]][1]][1]
         return {"classes":classes,"attributes":attributes,"methods":methods}
-        #with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'w') as f:
-        #    json.dump(json.dumps(data), f)
 
     def analyse_controller_file(self, filename):
-        return {}
+        methods_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
+        variables_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
+        methods = {}
+        variables = []
+        variables.append([])
+
+        for line in open(filename,'r'):
+            line = line.strip()
+            results_methods = methods_mask.match(line)
+            if results_methods:
+                current_function = results_methods.group(2).lower()
+                methods[current_function] = [current_function,self.parse_function_prototype(results_methods.group(3).lower())]
+        return {"methods":methods}
 
     def parse_function_prototype(self,prototype_raw):
         parameters = prototype_raw.split(",")
