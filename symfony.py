@@ -21,8 +21,16 @@ CLASS_DEFAULT = VAL_UNKNOWN
 
 RETURN_DEFAULT = [VAR_PLAIN,"void"]
 
+CONTROLLER_FOLDERS = ["Controller"]
+ENTITY_FOLDERS = ["Entity"]
+
+ANALYSE_ENTITY = 1
+ANALYSE_CONTROLLER = 2
+ANALYSE_DEFAULT = ANALYSE_CONTROLLER
+
 class SymfonyscanCommand(sublime_plugin.TextCommand):
     def __init__(self, view):
+        self.data = {}
         with open(os.path.dirname(os.path.realpath(__file__)) + PATH_SLASH + 'Symfony' + PATH_SLASH + 'data' + PATH_SLASH + 'last_scan.txt', 'r') as f:
             self.last_scan = json.loads(f.read())
         self.view = view
@@ -48,29 +56,55 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
                 nf = f.replace(PATH_SLASH+PATH_SLASH,PATH_SLASH)
                 if nf in filename:
                     filename = filename.replace(nf,"")
-        return filename.strip(PATH_SLASH).split(".",1)[0].replace(PATH_SLASH,"-")
+        return filename.strip(PATH_SLASH).split(".",1)[0]
         # Takes the main part without the \\ at each end
         # Then split it to remove the extension
+
+    def analyse(self,filename,analyse_type):
+        if analyse_type == ANALYSE_ENTITY:
+            return self.analyse_entity_file(filename)
+        elif analyse_type == ANALYSE_CONTROLLER:
+            return self.analyse_controller_file(filename)
 
     def save_file(self,filename):
         last_modified_time = time.ctime(os.path.getmtime(filename))
         filenameShort = self.shorten_filename(filename)
+        try:
+            parent_folder = filenameShort.split(PATH_SLASH)[-2]
+        except:
+            parent_folder = ""
+        filenameShort = filenameShort.replace(PATH_SLASH,"-")
+        
+        if parent_folder in ENTITY_FOLDERS:
+            analyse_type = ANALYSE_ENTITY
+        elif parent_folder in CONTROLLER_FOLDERS:
+            analyse_type = ANALYSE_CONTROLLER
+        else:
+            analyse_type = ANALYSE_DEFAULT
+
         filenameKey = filenameShort
         project_name = sublime.active_window().project_file_name().split(PATH_SLASH)[-1].split(".")[0]
         dir_project_scans = os.path.dirname(os.path.realpath(__file__)) + PATH_SLASH + 'Symfony' + PATH_SLASH + 'data' + PATH_SLASH + project_name
         if not project_name in self.last_scan.keys():
             self.last_scan[project_name] = {}
+        if not project_name in self.data.keys():
+            self.data[project_name] = {}
         if not os.path.isdir(dir_project_scans):
             os.mkdir(dir_project_scans)
-        if project_name in self.last_scan.keys() and filenameKey in self.last_scan[project_name].keys() and self.last_scan[project_name][filenameKey] >= float(os.path.getmtime(filename)):
-            print("Exists and was scanned on the " + time.ctime(self.last_scan[project_name][filenameKey]))
+        if filenameKey in self.data[project_name].keys():
+            return True
+        elif filenameKey in self.last_scan[project_name].keys() and self.last_scan[project_name][filenameKey] >= float(os.path.getmtime(filename)):
+            print("Exists and was scanned on the " + time.ctime(self.last_scan[project_name][filenameKey]) + " whereas last modification time of the file is " + time.ctime(os.path.getmtime(filename)))
+            return True
         else:
-            with open(dir_project_scans + PATH_SLASH + str(len(self.last_scan)) + filenameKey + '.txt', 'w') as f:
-                json.dump(self.analyse_file(filename),f)
+            with open(dir_project_scans + PATH_SLASH + filenameKey + '.txt', 'w') as f:
+                self.data[project_name][filenameKey] = self.analyse(filename,analyse_type)
+                json.dump(self.data[project_name][filenameKey],f)
             self.last_scan[project_name][filenameKey] = time.time()
             print("Has never been scanned but it's now done !")
+            return True
 
-    def analyse_file(self, filename):
+    def analyse_entity_file(self, filename):
         methods_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
         attributes_mask = re.compile(r'(public|private|protected) \$(\w+);')
         type_var_mask = re.compile(r'^\* @var \\?(\w+)')
@@ -160,6 +194,9 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
         return {"classes":classes,"attributes":attributes,"methods":methods}
         #with open(os.path.dirname(os.path.realpath(__file__)) + '\\Symfony\\data\\test.txt', 'w') as f:
         #    json.dump(json.dumps(data), f)
+
+    def analyse_controller_file(self, filename):
+        return {}
 
     def parse_function_prototype(self,prototype_raw):
         parameters = prototype_raw.split(",")
