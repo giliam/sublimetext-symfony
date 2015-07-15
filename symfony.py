@@ -205,8 +205,8 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
         functions_mask = re.compile(r'(public|private|protected) function (\w+)\(([\\|\w|\$|,| ]*)\)')
         variables_mask = re.compile(r'^\$([\w|_]+) ?= ?\$(.+);$')
         methods = {}
-        variables = []
-        variables.append([])
+        variables = {}
+        current_function = VAL_UNKNOWN
 
         for line in open(filename,'r'):
             line = line.strip()
@@ -215,8 +215,21 @@ class SymfonyscanCommand(sublime_plugin.TextCommand):
             if results_functions:
                 current_function = results_functions.group(2).lower()
                 methods[current_function] = [current_function,self.parse_function_prototype(results_functions.group(3).lower())]
+                variables[current_function] = {}
             elif results_variables:
-                variable_name = results_variables.group(2)
+                variable_name = results_variables.group(1)
+                variables[current_function][variable_name] = []
+                definition = results_variables.group(2)
+                if "->" in definition:
+                    definition_informations = definition.split("->")
+                    if definition_informations[0] == "manager":
+                        entity_mask = re.match(r'^getRepository\(\'(\w+):(\w+)\'\)$',definition_informations[1])
+                        if entity_mask:
+                            variables[current_function][variable_name].append([entity_mask.group(2)])
+                    elif definition_informations[0] == "this":
+                        if "getUser" in definition_informations[1]:
+                            variables[current_function][variable_name].append(["utilisateur"])
+
         #return {"methods":methods}
 
     def parse_function_prototype(self,prototype_raw):
